@@ -1,0 +1,58 @@
+---
+- hosts: localhost
+  become: yes
+
+  tasks:
+    - name: Install pip
+      apt:
+       name: python-pip
+       update_cache: yes
+       state: present
+
+    - name: Install aptitude using apt
+      apt: name=aptitude state=latest update_cache=yes force_apt_get=yes
+
+    - name: Install required system packages
+      apt: name={{ item }} state=latest update_cache=yes
+      loop: [ 'apt-transport-https', 'ca-certificates', 'curl', 'software-properties-common', 'python3-pip', 'virtualenv', 'python3-setuptools']
+
+    - name: Add Docker GPG apt Key
+      apt_key:
+        url: https://download.docker.com/linux/ubuntu/gpg
+        state: present
+
+    - name: Add Docker Repository
+      apt_repository:
+        repo: deb https://download.docker.com/linux/ubuntu bionic stable
+        state: present
+
+    - name: Update apt and install docker-ce
+      apt: update_cache=yes name=docker-ce state=latest
+
+    - name: Install Docker Module for Python
+      pip:
+        name: docker
+
+    - name: Ensure jenkins directory on docker host
+      file:
+        state: directory
+        owner: 1000
+        group: 1000
+        path: /share/jenkins
+
+    - name: Pull the latest official jenkins docker image
+      docker_image:
+       name: "jenkinsci/blueocean"
+
+    - name: Create a container from the jenkins docker image
+      docker_container:
+       name: "jenkins-server"
+       image: "jenkinsci/blueocean"
+       ports:
+          - "8080:8080"
+          - "50000:50000"
+       volumes:
+          - "/share/jenkins:/var/jenkins_home"
+          - "/var/run/docker.sock:/var/run/docker.sock"
+       state: present
+       recreate: no
